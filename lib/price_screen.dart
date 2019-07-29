@@ -34,7 +34,7 @@ class _PriceScreenState extends State<PriceScreen> {
       onChanged: (newValue) {
         setState(() {
           selectedCurrency = newValue;
-          getTickerData();
+          getData();
         });
       },
     );
@@ -51,25 +51,48 @@ class _PriceScreenState extends State<PriceScreen> {
         itemExtent: 35.0,
         onSelectedItemChanged: (selectedIndex) {
           selectedCurrency = currenciesList[selectedIndex];
-          getTickerData();
+          getData();
         },
         children: pickerItems);
   }
 
-  void getTickerData() async {
-    btcValue = '?';
-    NetworkHelper network =
-        NetworkHelper(url: '$url${cryptoList[0]}$selectedCurrency');
-    var btcResponse = await network.getTickerData();
-    network = NetworkHelper(url: '$url${cryptoList[1]}$selectedCurrency');
-    var ethResponse = await network.getTickerData();
-    network = NetworkHelper(url: '$url${cryptoList[2]}$selectedCurrency');
-    var ltcResponse = await network.getTickerData();
-    setState(() {
-      btcValue = btcResponse['ask'].round().toString();
-      ethValue = ethResponse['ask'].round().toString();
-      ltcValue = ltcResponse['ask'].round().toString();
-    });
+  Map<String, String> coinValues = {};
+  bool isWaiting = false;
+
+  void getData() async {
+    isWaiting = true;
+    try {
+      var data = await CoinData().getCoinData(selectedCurrency);
+      isWaiting = false;
+      setState(() {
+        coinValues = data;
+      });
+    } catch (e) {
+      print(e);
+    }
+  }
+
+  Column makeCards() {
+    List<CryptoCard> cryptoCards = [];
+    for (String crypto in cryptoList) {
+      cryptoCards.add(
+        CryptoCard(
+          cryptoCurrency: crypto,
+          selectedCurrency: selectedCurrency,
+          value: isWaiting ? '?' : coinValues[crypto],
+        ),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: cryptoCards,
+    );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    getData();
   }
 
   @override
@@ -82,21 +105,7 @@ class _PriceScreenState extends State<PriceScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          TickerCard(
-            type: cryptoList[0],
-            value: btcValue,
-            currency: selectedCurrency,
-          ),
-          TickerCard(
-            type: cryptoList[1],
-            value: ethValue,
-            currency: selectedCurrency,
-          ),
-          TickerCard(
-            type: cryptoList[2],
-            value: ltcValue,
-            currency: selectedCurrency,
-          ),
+          makeCards(),
           Container(
               height: 150.0,
               alignment: Alignment.center,
@@ -109,12 +118,16 @@ class _PriceScreenState extends State<PriceScreen> {
   }
 }
 
-class TickerCard extends StatelessWidget {
-  TickerCard({this.type, this.value, this.currency});
+class CryptoCard extends StatelessWidget {
+  const CryptoCard({
+    this.value,
+    this.selectedCurrency,
+    this.cryptoCurrency,
+  });
 
-  final String type;
   final String value;
-  final String currency;
+  final String selectedCurrency;
+  final String cryptoCurrency;
 
   @override
   Widget build(BuildContext context) {
@@ -129,7 +142,7 @@ class TickerCard extends StatelessWidget {
         child: Padding(
           padding: EdgeInsets.symmetric(vertical: 15.0, horizontal: 28.0),
           child: Text(
-            '1 $type = $value $currency',
+            '1 $cryptoCurrency = $value $selectedCurrency',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 20.0,
